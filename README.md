@@ -20,3 +20,13 @@
 - A conexão usa um servidor STUN público para tentar atravessar NAT. Algumas redes móveis, roteadores ou firewalls exigem um serviço TURN. O protótipo não configura TURN nem garante conexão em todas as redes.
 - Para um produto de uso contínuo, substitua a troca manual por sinalização autenticada via HTTPS/WebSocket, códigos de pareamento de uso único, expiração curta, limites de tentativas, auditoria e um TURN gerenciado com credenciais temporárias.
 - A câmera só é solicitada após a ação visível da pessoa e a confirmação no aparelho que compartilha. Não use o sistema para vigiar alguém sem consentimento.
+
+
+## Pareamento rápido por código (novo)
+1. Atualize/abra o site publicado por HTTPS nos dois Androids.
+2. No Android que vai compartilhar a câmera, selecione **Compartilhar minha câmera**, marque a autorização e toque em **Gerar código e compartilhar**. Aceite a permissão de câmera do navegador.
+3. Envie o código de 8 caracteres exibido para o outro aparelho, por um canal privado.
+4. No aparelho que vai visualizar, selecione **Visualizar câmera de outro aparelho**, digite o código e toque em **Conectar com código**.
+5. Para terminar, toque em **Encerrar conexão** no aparelho que compartilha ou no visualizador.
+
+Este pareamento usa PeerJS Cloud como serviço de sinalização e WebRTC para mídia. A disponibilidade depende do serviço externo e das redes usadas. O código não é uma credencial de autenticação forte: trate-o como informação privada e encerre a sessão quando terminar. O protótipo aceita uma chamada ativa por vez, não envia áudio e não substitui autenticação de produção, TURN gerenciado ou pareamento com expiração no servidor.
