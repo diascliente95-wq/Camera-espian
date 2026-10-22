@@ -46,6 +46,34 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
 <p id="message" class="info" aria-live="polite"></p>
 </aside>
 </div>
+
+<section class="card" id="remotePanel">
+  <h2 style="margin-top:0">📡 Câmera remota pela internet</h2>
+  <p class="info">Conecte dois aparelhos com troca manual de códigos de conexão. A câmera só é ativada no Android que compartilha quando a pessoa toca no botão e autoriza o navegador. Não há servidor de sinalização configurado nesta versão.</p>
+  <div class="tools">
+    <label for="remoteRole">Este aparelho será
+      <select id="remoteRole"><option value="host">Android que compartilha a câmera</option><option value="viewer">Aparelho que vai visualizar</option></select>
+    </label>
+  </div>
+  <div id="hostConsent" class="notice">No aparelho que compartilha, marque a confirmação e toque em “Iniciar compartilhamento”. A câmera não será aberta antes disso.</div>
+  <label id="consentLabel" class="info" style="display:flex;gap:10px;align-items:flex-start;margin:12px 0"><input id="consent" type="checkbox" style="margin-top:3px"> Eu autorizo compartilhar a câmera deste aparelho nesta sessão e entendo que a outra pessoa poderá ver a imagem ao vivo.</label>
+  <div class="view" style="margin:12px 0"><video id="remotePreview" autoplay playsinline muted></video><div id="remotePlaceholder" class="placeholder"><div class="cam">🔗</div><strong id="remotePlaceholderTitle">Sessão remota desligada</strong><div class="info">A imagem aparecerá quando a conexão for estabelecida.</div></div></div>
+  <div class="status"><span id="remoteDot" class="dot"></span><span id="remoteStatus" aria-live="polite">Desconectado</span></div>
+  <div class="controls">
+    <button class="btn primary" id="remoteStart">Iniciar compartilhamento</button>
+    <button class="btn" id="makeAnswer" disabled>Criar resposta</button>
+    <button class="btn" id="makeOffer" disabled>Criar convite</button>
+    <button class="btn" id="applyAnswer" disabled>Aplicar resposta</button>
+    <button class="btn" id="remoteStop" disabled>Encerrar sessão</button>
+  </div>
+  <label class="info" for="signalOut" style="display:block;margin-top:14px">Código para enviar ao outro aparelho</label>
+  <textarea id="signalOut" rows="4" placeholder="O código de conexão aparecerá aqui." style="width:100%;margin-top:6px;background:#070b14;color:#f4f7fb;border:1px solid #34465f;border-radius:10px;padding:12px;font-size:12px"></textarea>
+  <div class="controls"><button class="btn" id="copySignal">Copiar código</button><button class="btn" id="loadSignal">Usar código recebido</button></div>
+  <label class="info" for="signalIn" style="display:block;margin-top:12px">Cole aqui o código recebido do outro aparelho</label>
+  <textarea id="signalIn" rows="4" placeholder="Cole o código de convite ou resposta." style="width:100%;margin-top:6px;background:#070b14;color:#f4f7fb;border:1px solid #34465f;border-radius:10px;padding:12px;font-size:12px"></textarea>
+  <p id="remoteMessage" class="info" aria-live="polite">Para conectar: no aparelho que compartilha, iniciar compartilhamento e criar convite. No visualizador, usar o convite recebido e criar resposta. Devolva a resposta ao aparelho que compartilha e aplique-a.</p>
+  <p class="info">Segurança: não publique os códigos; compartilhe-os apenas com a pessoa autorizada. Para encerrar, use “Encerrar sessão” ou desligue a câmera. Alguns roteadores exigem um servidor TURN para conectar pela internet; este protótipo usa STUN e pode não funcionar em todas as redes.</p>
+</section>
 <footer>Camera Espian • Protótipo de câmera autorizado</footer>
 </main>
 <script>
@@ -178,6 +206,144 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
   }
   setLive(false);
   if (!window.MediaRecorder) recordBtn.title = 'Este navegador não suporta gravação via MediaRecorder.';
+})();
+</script>
+
+<script>
+(() => {
+ const $ = id => document.getElementById(id);
+ const role = $('remoteRole'), consent = $('consent'), consentLabel = $('consentLabel');
+ const hostConsent = $('hostConsent'), start = $('remoteStart'), offerBtn = $('makeOffer'), answerBtn = $('makeAnswer'), applyBtn = $('applyAnswer'), stopBtn = $('remoteStop');
+ const out = $('signalOut'), input = $('signalIn'), msg = $('remoteMessage'), status = $('remoteStatus'), dot = $('remoteDot');
+ const preview = $('remotePreview'), placeholder = $('remotePlaceholder'), placeholderTitle = $('remotePlaceholderTitle');
+ let pc = null, localStream = null, remoteStream = null, isHost = true;
+ const iceServers = [{urls:'stun:stun.l.google.com:19302'}];
+
+ function say(text, connected=false) { msg.textContent = text; status.textContent = connected ? 'Conectado — vídeo ao vivo' : text; dot.classList.toggle('live', connected); }
+ function setPreview(live) { preview.style.display = live ? 'block' : 'none'; placeholder.classList.toggle('hidden', live); }
+ function syncRole() {
+   isHost = role.value === 'host';
+   consentLabel.style.display = isHost ? 'flex' : 'none';
+   hostConsent.style.display = isHost ? 'block' : 'none';
+   start.textContent = isHost ? 'Iniciar compartilhamento' : 'Preparar visualizador';
+   start.disabled = false;
+   offerBtn.disabled = !isHost || !localStream;
+   answerBtn.disabled = isHost;
+   applyBtn.disabled = isHost;
+   placeholderTitle.textContent = isHost ? 'Compartilhamento ainda não iniciado' : 'Aguardando vídeo remoto';
+ }
+ async function waitIce() {
+   if (!pc || pc.iceGatheringState === 'complete') return;
+   await new Promise(resolve => {
+     const timer = setTimeout(done, 12000);
+     function done() { clearTimeout(timer); pc?.removeEventListener('icegatheringstatechange', check); resolve(); }
+     function check() { if (pc && pc.iceGatheringState === 'complete') done(); }
+     pc.addEventListener('icegatheringstatechange', check);
+   });
+ }
+ function newPeer() {
+   if (pc) pc.close();
+   pc = new RTCPeerConnection({iceServers});
+   pc.onconnectionstatechange = () => {
+     if (!pc) return;
+     if (pc.connectionState === 'connected') say('Conexão estabelecida. Vídeo ao vivo.', true);
+     else if (pc.connectionState === 'failed') say('A conexão falhou. Esta rede pode precisar de configuração TURN. Tente novamente.');
+     else if (pc.connectionState === 'disconnected') say('Conexão interrompida. Tentando recuperar...');
+     else if (pc.connectionState === 'closed') say('Sessão encerrada.');
+   };
+   pc.ontrack = event => {
+     remoteStream = event.streams[0];
+     preview.srcObject = remoteStream;
+     preview.muted = !isHost;
+     preview.play().catch(() => {});
+     setPreview(true);
+   };
+   pc.oniceconnectionstatechange = () => {
+     if (pc && pc.iceConnectionState === 'connected') say('Conexão estabelecida. Vídeo ao vivo.', true);
+   };
+   return pc;
+ }
+ async function startSharing() {
+   if (!consent.checked) { say('Marque a confirmação de autorização antes de ativar a câmera.'); return; }
+   if (!navigator.mediaDevices?.getUserMedia) { say('A câmera exige HTTPS e suporte do navegador.'); return; }
+   try {
+     localStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+     preview.srcObject = localStream; preview.muted = true; await preview.play(); setPreview(true);
+     newPeer();
+     localStream.getTracks().forEach(track => pc.addTrack(track, localStream));
+     start.disabled = true; offerBtn.disabled = false; stopBtn.disabled = false;
+     say('Câmera ativa. Agora crie o convite e envie o código à pessoa autorizada.');
+   } catch (e) {
+     say(e.name === 'NotAllowedError' ? 'Permissão da câmera negada. Autorize no navegador e tente novamente.' : 'Não foi possível abrir a câmera. Verifique as permissões e tente novamente.');
+   }
+ }
+ async function createOffer() {
+   try {
+     if (!pc || !localStream) { say('Inicie o compartilhamento antes de criar o convite.'); return; }
+     const desc = await pc.createOffer();
+     await pc.setLocalDescription(desc); say('Preparando convite seguro… aguarde alguns segundos.');
+     await waitIce();
+     out.value = JSON.stringify(pc.localDescription);
+     say('Convite criado. Copie o código e envie-o diretamente ao visualizador.');
+     applyBtn.disabled = false;
+   } catch(e) { say('Não foi possível criar o convite. Encerre e tente novamente.'); }
+ }
+ async function createAnswer() {
+   try {
+     const offer = JSON.parse(input.value.trim());
+     if (!offer || offer.type !== 'offer' || !offer.sdp) throw new Error('bad offer');
+     newPeer();
+     await pc.setRemoteDescription(offer);
+     const answer = await pc.createAnswer();
+     await pc.setLocalDescription(answer);
+     say('Preparando resposta… aguarde alguns segundos.');
+     await waitIce();
+     out.value = JSON.stringify(pc.localDescription);
+     stopBtn.disabled = false;
+     say('Resposta criada. Envie o código de resposta ao aparelho que compartilha a câmera.');
+   } catch(e) { say('Convite inválido ou incompleto. Cole o código completo recebido do aparelho que compartilha.'); }
+ }
+ async function applyAnswer() {
+   try {
+     const answer = JSON.parse(input.value.trim());
+     if (!answer || answer.type !== 'answer' || !answer.sdp || !pc) throw new Error('bad answer');
+     await pc.setRemoteDescription(answer);
+     say('Resposta aplicada. Aguardando conexão…');
+   } catch(e) { say('Resposta inválida ou não esperada. Cole a resposta criada pelo visualizador.'); }
+ }
+ async function loadSignal() {
+   if (!input.value.trim()) { say('Cole primeiro o código recebido.'); return; }
+   try {
+     const data = JSON.parse(input.value.trim());
+     if (data.type === 'offer' && !isHost) await createAnswer();
+     else if (data.type === 'answer' && isHost) await applyAnswer();
+     else say('Esse código não corresponde à função selecionada. Confira se está no aparelho certo.');
+   } catch(e) { say('Não foi possível ler o código. Copie e cole o texto JSON completo.'); }
+ }
+ async function copySignal() {
+   if (!out.value) { say('Crie primeiro o convite ou a resposta.'); return; }
+   try { await navigator.clipboard.writeText(out.value); say('Código copiado. Envie-o apenas à pessoa autorizada.'); }
+   catch(e) { out.focus(); out.select(); say('Selecione e copie o código manualmente.'); }
+ }
+ function stopSession() {
+   if (localStream) localStream.getTracks().forEach(t => t.stop());
+   if (remoteStream) remoteStream.getTracks().forEach(t => t.stop());
+   if (pc) pc.close();
+   pc = null; localStream = null; remoteStream = null;
+   preview.srcObject = null; setPreview(false);
+   out.value = ''; input.value = ''; consent.checked = false;
+   start.disabled = false; stopBtn.disabled = true; offerBtn.disabled = true; answerBtn.disabled = isHost; applyBtn.disabled = isHost;
+   say('Sessão encerrada. A câmera foi desligada.');
+ }
+ role.addEventListener('change', () => { stopSession(); syncRole(); });
+ start.addEventListener('click', () => isHost ? startSharing() : (say('No aparelho visualizador, cole o convite recebido e toque em “Usar código recebido”.'), answerBtn.disabled = false));
+ offerBtn.addEventListener('click', createOffer);
+ answerBtn.addEventListener('click', createAnswer);
+ applyBtn.addEventListener('click', applyAnswer);
+ $('loadSignal').addEventListener('click', loadSignal);
+ $('copySignal').addEventListener('click', copySignal);
+ stopBtn.addEventListener('click', stopSession);
+ syncRole(); setPreview(false); stopBtn.disabled = true;
 })();
 </script>
 </body>
