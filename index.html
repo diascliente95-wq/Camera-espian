@@ -47,9 +47,27 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
 </aside>
 </div>
 
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <section class="card" id="remotePanel">
   <h2 style="margin-top:0">📡 Câmera remota pela internet</h2>
   <p class="info">Conecte dois aparelhos com troca manual de códigos de conexão. A câmera só é ativada no Android que compartilha quando a pessoa toca no botão e autoriza o navegador. Não há servidor de sinalização configurado nesta versão.</p>
+  <div class="notice" style="margin:12px 0"><strong>Pareamento por código único:</strong> o aparelho que compartilha gera um código curto. No outro aparelho, basta digitar esse código para solicitar a conexão. Ambos precisam estar com o site aberto e conectados à internet.</div>
+  <div class="card" style="margin:12px 0;background:#0b1220">
+    <h3 style="margin-top:0">Conectar por código</h3>
+    <label class="info" for="pairRole">Função deste aparelho
+      <select id="pairRole"><option value="host">Compartilhar minha câmera</option><option value="viewer">Visualizar câmera de outro aparelho</option></select>
+    </label>
+    <label id="pairConsentLabel" class="info" style="display:flex;gap:10px;align-items:flex-start;margin:12px 0"><input id="pairConsent" type="checkbox" style="margin-top:3px"> Autorizo compartilhar a câmera deste aparelho durante esta sessão.</label>
+    <div id="pairCodeDisplay" style="font-size:30px;font-weight:800;letter-spacing:.15em;text-align:center;padding:14px;color:#36e0b4;word-break:break-word">------</div>
+    <label class="info" for="pairCodeInput">Código do outro aparelho (para quem vai visualizar)</label>
+    <input id="pairCodeInput" inputmode="text" autocomplete="off" maxlength="8" placeholder="Ex.: A7K9P2QX" style="width:100%;margin-top:6px;background:#070b14;color:#f4f7fb;border:1px solid #34465f;border-radius:10px;padding:12px;font-size:18px;text-transform:uppercase">
+    <div class="controls">
+      <button class="btn primary" id="pairStart">Gerar código e compartilhar</button>
+      <button class="btn" id="pairConnect">Conectar com código</button>
+      <button class="btn" id="pairStop" disabled>Encerrar conexão</button>
+    </div>
+    <p class="info" id="pairStatus" aria-live="polite">Desconectado. O código é temporário e só deve ser compartilhado com a pessoa autorizada.</p>
+  </div>
   <div class="tools">
     <label for="remoteRole">Este aparelho será
       <select id="remoteRole"><option value="host">Android que compartilha a câmera</option><option value="viewer">Aparelho que vai visualizar</option></select>
@@ -344,6 +362,138 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
  $('copySignal').addEventListener('click', copySignal);
  stopBtn.addEventListener('click', stopSession);
  syncRole(); setPreview(false); stopBtn.disabled = true;
+})();
+</script>
+
+<script>
+(() => {
+ const $ = id => document.getElementById(id);
+ const role = $('pairRole'), consent = $('pairConsent'), consentLabel = $('pairConsentLabel');
+ const codeDisplay = $('pairCodeDisplay'), codeInput = $('pairCodeInput');
+ const startBtn = $('pairStart'), connectBtn = $('pairConnect'), stopBtn = $('pairStop'), status = $('pairStatus');
+ const remotePreview = $('remotePreview');
+ let peer = null, localStream = null, activeCall = null, remotePairStream = null, activeRole = 'host';
+ const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+ function setStatus(text, live=false) {
+   status.textContent = text;
+   $('remoteStatus').textContent = text;
+   $('remoteDot').classList.toggle('live', live);
+ }
+ function makeCode() {
+   const bytes = new Uint8Array(8);
+   crypto.getRandomValues(bytes);
+   return Array.from(bytes, b => alphabet[b % alphabet.length]).join('');
+ }
+ function setPairRole() {
+   activeRole = role.value;
+   consentLabel.style.display = activeRole === 'host' ? 'flex' : 'none';
+   startBtn.style.display = activeRole === 'host' ? 'block' : 'none';
+   connectBtn.style.display = activeRole === 'viewer' ? 'block' : 'none';
+   codeInput.disabled = activeRole !== 'viewer';
+   codeDisplay.textContent = '--------';
+   setStatus(activeRole === 'host' ? 'Pronto para criar um código de compartilhamento.' : 'Digite o código fornecido pelo aparelho que compartilha.');
+ }
+ function makePeer(id) {
+   if (!window.Peer) throw new Error('A biblioteca de conexão não carregou. Verifique a internet e atualize a página.');
+   return new Promise((resolve, reject) => {
+     const p = id ? new Peer(id, {debug: 1}) : new Peer(undefined, {debug: 1});
+     const timeout = setTimeout(() => { try { p.destroy(); } catch {} reject(new Error('Tempo de conexão esgotado. Tente outro código.')); }, 15000);
+     p.once('open', () => { clearTimeout(timeout); resolve(p); });
+     p.once('error', err => { clearTimeout(timeout); reject(err); });
+   });
+ }
+ async function startHost() {
+   if (!consent.checked) { setStatus('Marque a autorização no aparelho que vai compartilhar a câmera.'); return; }
+   if (!navigator.mediaDevices?.getUserMedia) { setStatus('A câmera exige HTTPS e um navegador compatível.'); return; }
+   startBtn.disabled = true;
+   try {
+     setStatus('Solicitando permissão da câmera…');
+     localStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280},height:{ideal:720}},audio:false});
+     remotePreview.srcObject = localStream; remotePreview.muted = true; remotePreview.style.display = 'block'; $('remotePlaceholder').classList.add('hidden');
+     setStatus('Conectando ao serviço de pareamento…');
+     let code = makeCode();
+     for (let tries=0; tries<3; tries++) {
+       try { peer = await makePeer(code); break; }
+       catch (e) { if (tries === 2) throw e; code = makeCode(); }
+     }
+     codeDisplay.textContent = code;
+     peer.on('call', call => {
+       if (activeCall) { call.close(); return; }
+       activeCall = call;
+       call.answer(localStream);
+       call.on('stream', stream => {
+         remotePairStream = stream;
+         setStatus('Visualização remota conectada.', true);
+       });
+       call.on('close', () => { activeCall = null; setStatus('O visualizador desconectou. O código continua ativo.'); });
+       call.on('error', () => setStatus('A chamada falhou. Tente gerar outro código.'));
+     });
+     peer.on('error', err => setStatus('Conexão: ' + (err.type === 'unavailable-id' ? 'código ocupado; encerre e gere outro.' : 'erro de rede. Confira a internet.')));
+     stopBtn.disabled = false;
+     setStatus('Código pronto. Envie-o somente à pessoa autorizada. A câmera está ativa.', true);
+   } catch (e) {
+     if (localStream) localStream.getTracks().forEach(t => t.stop());
+     localStream = null;
+     remotePreview.srcObject = null; remotePreview.style.display = 'none'; $('remotePlaceholder').classList.remove('hidden');
+     startBtn.disabled = false;
+     setStatus('Não foi possível iniciar: ' + (e.message || 'verifique a permissão e a conexão.'));
+   }
+ }
+ async function connectViewer() {
+   const code = codeInput.value.trim().toUpperCase();
+   if (!/^[A-HJ-NP-Z2-9]{8}$/.test(code)) { setStatus('Digite o código de 8 caracteres mostrado no aparelho que compartilha.'); return; }
+   connectBtn.disabled = true;
+   try {
+     setStatus('Conectando ao serviço de pareamento…');
+     peer = await makePeer();
+     peer.on('call', call => call.close());
+     peer.on('error', err => setStatus('Falha de conexão: ' + (err.type === 'peer-unavailable' ? 'código não encontrado ou aparelho offline.' : 'verifique a internet e tente novamente.')));
+     const emptyStream = new MediaStream();
+     activeCall = peer.call(code, emptyStream);
+     if (!activeCall) throw new Error('Não foi possível iniciar a solicitação.');
+     activeCall.on('stream', stream => {
+       remotePairStream = stream;
+       remotePreview.srcObject = stream; remotePreview.muted = false;
+       remotePreview.style.display = 'block'; $('remotePlaceholder').classList.add('hidden');
+       remotePreview.play().catch(() => {});
+       setStatus('Conectado: recebendo vídeo ao vivo.', true);
+       stopBtn.disabled = false;
+     });
+     activeCall.on('close', () => { setStatus('Sessão encerrada pelo outro aparelho.'); resetViewer(false); });
+     activeCall.on('error', () => { setStatus('Não foi possível receber vídeo. Gere outro código e tente novamente.'); resetViewer(false); });
+     setStatus('Solicitação enviada. Aguarde a conexão…');
+     stopBtn.disabled = false;
+   } catch (e) {
+     connectBtn.disabled = false;
+     setStatus('Não foi possível conectar: ' + (e.message || 'verifique o código e a internet.'));
+   }
+ }
+ function resetViewer(enable=true) {
+   if (activeCall) { try { activeCall.close(); } catch {} }
+   activeCall = null; remotePairStream = null;
+   remotePreview.srcObject = null; remotePreview.style.display = 'none'; $('remotePlaceholder').classList.remove('hidden');
+   connectBtn.disabled = !enable; stopBtn.disabled = true;
+ }
+ function stopPair() {
+   if (activeCall) { try { activeCall.close(); } catch {} }
+   if (peer) { try { peer.destroy(); } catch {} }
+   if (localStream) localStream.getTracks().forEach(t => t.stop());
+   if (remotePairStream) remotePairStream.getTracks().forEach(t => t.stop());
+   peer = null; activeCall = null; localStream = null; remotePairStream = null;
+   remotePreview.srcObject = null; remotePreview.style.display = 'none'; $('remotePlaceholder').classList.remove('hidden');
+   codeDisplay.textContent = '--------'; startBtn.disabled = false; connectBtn.disabled = false; stopBtn.disabled = true; consent.checked = false;
+   setStatus('Sessão encerrada. A câmera foi desligada.');
+ }
+ role.addEventListener('change', () => { stopPair(); setPairRole(); });
+ startBtn.addEventListener('click', startHost);
+ connectBtn.addEventListener('click', connectViewer);
+ stopBtn.addEventListener('click', stopPair);
+ window.addEventListener('pagehide', () => {
+   if (activeCall) activeCall.close();
+   if (peer) peer.destroy();
+   if (localStream) localStream.getTracks().forEach(t => t.stop());
+ });
+ setPairRole();
 })();
 </script>
 </body>
