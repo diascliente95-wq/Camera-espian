@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#0b1220">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
 <title>Camera Espian — Câmera Web</title>
 <style>
 :root{color-scheme:dark;--bg:#070b14;--panel:#101827;--line:#263449;--accent:#36e0b4;--muted:#9aacbf}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#14243a 0,#070b14 60%);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#f4f7fb;min-height:100vh}
 main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo{width:46px;height:46px;border-radius:14px;background:#123b39;color:var(--accent);display:grid;place-items:center;font-size:24px;border:1px solid #26665e}.eyebrow{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}.top h1{font-size:clamp(23px,5vw,34px);margin:2px 0}.sub{color:var(--muted);margin:0;font-size:14px}
-.card{background:rgba(16,24,39,.94);border:1px solid var(--line);border-radius:20px;padding:16px;margin:14px 0;box-shadow:0 14px 40px #0003}.view{position:relative;aspect-ratio:4/3;background:#03060b;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:1px solid #263449}video{width:100%;height:100%;object-fit:contain;display:none}.placeholder{text-align:center;padding:24px;color:var(--muted)}.placeholder .cam{font-size:48px;margin-bottom:10px}.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin:12px 2px}.dot{height:9px;width:9px;border-radius:50%;background:#718096}.dot.live{background:#ff4757;box-shadow:0 0 10px #ff4757}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.controls button{min-height:48px}.btn{border:1px solid #34465f;border-radius:12px;background:#19263a;color:#f4f7fb;padding:12px 14px;font-weight:700;font-size:14px;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent);color:#04251f}.btn.record{background:#4a1924;border-color:#773144}.btn:disabled{opacity:.45;cursor:not-allowed}.info{font-size:13px;color:var(--muted);line-height:1.55}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 9px;margin:4px 4px 0 0;font-size:11px;color:#b6c7d9}.notice{border-left:3px solid var(--accent);padding:10px 12px;background:#0c2828;border-radius:8px;color:#c7f6ea;font-size:13px;line-height:1.5}.hidden{display:none!important}a{color:var(--accent)}footer{text-align:center;color:#72839a;font-size:12px;padding:15px}
+.card{background:rgba(16,24,39,.94);border:1px solid var(--line);border-radius:20px;padding:16px;margin:14px 0;box-shadow:0 14px 40px #0003}.view{position:relative;aspect-ratio:4/3;background:#03060b;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:1px solid #263449}video{width:100%;height:100%;object-fit:contain;display:none}.placeholder{text-align:center;padding:24px;color:var(--muted)}.placeholder .cam{font-size:48px;margin-bottom:10px}.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin:12px 2px}.dot{height:9px;width:9px;border-radius:50%;background:#718096}.dot.live{background:#ff4757;box-shadow:0 0 10px #ff4757}.tools{display:grid;grid-template-columns:1fr;gap:8px;margin:12px 0}.tools label{font-size:12px;color:var(--muted)}select{width:100%;margin-top:5px;background:#19263a;color:#f4f7fb;border:1px solid #34465f;border-radius:10px;padding:11px}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.controls button{min-height:48px}.btn{border:1px solid #34465f;border-radius:12px;background:#19263a;color:#f4f7fb;padding:12px 14px;font-weight:700;font-size:14px;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent);color:#04251f}.btn.record{background:#4a1924;border-color:#773144}.btn:disabled{opacity:.45;cursor:not-allowed}.info{font-size:13px;color:var(--muted);line-height:1.55}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 9px;margin:4px 4px 0 0;font-size:11px;color:#b6c7d9}.notice{border-left:3px solid var(--accent);padding:10px 12px;background:#0c2828;border-radius:8px;color:#c7f6ea;font-size:13px;line-height:1.5}.hidden{display:none!important}a{color:var(--accent)}footer{text-align:center;color:#72839a;font-size:12px;padding:15px}
 @media(min-width:700px){.content{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;align-items:start}.controls{grid-template-columns:1fr 1fr}}
 </style>
 </head>
@@ -24,17 +26,20 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
 <div class="controls">
 <button class="btn primary" id="start">Ativar câmera</button>
 <button class="btn" id="switch" disabled>Trocar câmera</button>
+<button class="btn" id="photo" disabled>📸 Tirar foto</button>
 <button class="btn record" id="record" disabled>● Iniciar gravação</button>
 <button class="btn" id="stopRecord" disabled>Parar gravação</button>
 <button class="btn" id="stop" disabled>Desligar câmera</button>
+<a class="btn hidden" id="photoDownload" download="camera-espian-foto.png">Baixar foto</a>
 <a class="btn hidden" id="download" download="camera-espian.webm">Baixar gravação</a>
 </div>
+<div class="tools"><label for="quality">Qualidade da câmera<select id="quality"><option value="1280x720">HD — 720p</option><option value="1920x1080">Full HD — 1080p</option><option value="640x480">Economia — 480p</option></select></label></div>
 <p class="info">Dica: use HTTPS (por exemplo, GitHub Pages) e permita o acesso à câmera quando o navegador perguntar. A troca de câmera depende do aparelho.</p>
 </section>
 <aside class="card">
 <h2 style="margin-top:0;font-size:19px">Como funciona</h2>
-<p class="info">1. Toque em <strong>Ativar câmera</strong>.<br>2. Autorize a câmera no navegador.<br>3. Para gravar, toque em <strong>Iniciar gravação</strong> e depois em <strong>Parar gravação</strong>.<br>4. Baixe o arquivo para salvá-lo no aparelho.</p>
-<div><span class="pill">Sem conta</span><span class="pill">Sem envio automático</span><span class="pill">Controles visíveis</span></div>
+<p class="info">1. Ative a câmera e autorize o navegador.<br>2. Escolha a qualidade da imagem.<br>3. Tire fotos ou inicie e pare uma gravação.<br>4. Baixe seus arquivos para o aparelho.</p>
+<div><span class="pill">Sem conta</span><span class="pill">Sem envio automático</span><span class="pill">Controles visíveis</span><span class="pill">PWA instalável</span></div>
 <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
 <h3 style="font-size:15px">Privacidade</h3>
 <p class="info">Este protótipo não envia áudio ou vídeo para um servidor. O arquivo de gravação é gerado no navegador e baixado somente quando você solicita. Fechar a página ou desligar a câmera interrompe a captura.</p>
@@ -55,6 +60,9 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
   const stopRecordBtn = document.getElementById('stopRecord');
   const stopBtn = document.getElementById('stop');
   const download = document.getElementById('download');
+  const photoBtn = document.getElementById('photo');
+  const photoDownload = document.getElementById('photoDownload');
+  const quality = document.getElementById('quality');
   const message = document.getElementById('message');
   let stream = null, recorder = null, chunks = [], facing = 'environment', recordedUrl = null;
 
@@ -65,6 +73,7 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
     video.style.display = live ? 'block' : 'none';
     startBtn.disabled = live;
     switchBtn.disabled = !live;
+    photoBtn.disabled = !live;
     recordBtn.disabled = !live || !window.MediaRecorder || (recorder && recorder.state === 'recording');
     stopBtn.disabled = !live;
   }
@@ -77,7 +86,7 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
     try {
       if (stream) stopCamera();
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        video: (() => { const [width,height] = quality.value.split("x").map(Number); return { facingMode: { ideal: facing }, width: { ideal: width }, height: { ideal: height } }; })(),
         audio: false
       });
       video.srcObject = stream;
@@ -98,6 +107,26 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
     stream = null;
     video.srcObject = null;
     setLive(false);
+  }
+
+  function takePhoto() {
+    if (!stream || !video.videoWidth) {
+      message.textContent = 'Ative a câmera antes de tirar uma foto.';
+      return;
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    canvas.toBlob(blob => {
+      if (!blob) { message.textContent = 'Não foi possível gerar a foto.'; return; }
+      if (photoDownload.dataset.url) URL.revokeObjectURL(photoDownload.dataset.url);
+      const url = URL.createObjectURL(blob);
+      photoDownload.href = url;
+      photoDownload.dataset.url = url;
+      photoDownload.classList.remove('hidden');
+      message.textContent = 'Foto pronta. Toque em “Baixar foto” para salvá-la.';
+    }, 'image/png');
   }
 
   function startRecording() {
@@ -135,6 +164,7 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
     await startCamera();
   });
   recordBtn.addEventListener('click', startRecording);
+  photoBtn.addEventListener('click', takePhoto);
   stopRecordBtn.addEventListener('click', () => {
     if (recorder && recorder.state === 'recording') recorder.stop();
   });
@@ -143,6 +173,9 @@ main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;
     if (stream) stream.getTracks().forEach(track => track.stop());
     if (recordedUrl) URL.revokeObjectURL(recordedUrl);
   });
+  if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+    window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {}));
+  }
   setLive(false);
   if (!window.MediaRecorder) recordBtn.title = 'Este navegador não suporta gravação via MediaRecorder.';
 })();
