@@ -40,3 +40,13 @@ Este pareamento usa PeerJS Cloud como serviço de sinalização e WebRTC para m�
 
 ### Limite importante de PWA
 Service workers não permanecem em execução contínua e não podem manter a câmera aberta de forma confiável com o app fechado/em segundo plano. Esta versão exige manter a tela Camera aberta. Para transmissão de câmera em segundo plano com notificação permanente no Android, é necessário um aplicativo Android nativo com serviço em primeiro plano, permissões adequadas e controles visíveis. A câmera sempre requer autorização do usuário.
+
+
+## Redes diferentes (Wi-Fi + dados móveis)
+As telas Camera e Viewer agora têm campos opcionais para configurar um servidor TURN:
+- Configure o mesmo endpoint TURN nos dois aparelhos.
+- Informe usuário e credencial válidos emitidos pelo provedor TURN.
+- Mantenha o STUN padrão; o TURN é usado como caminho alternativo quando a conexão direta não funciona.
+- Este repositório não inclui um servidor TURN nem credenciais. Sem um TURN válido, a conexão entre redes diferentes pode funcionar em algumas combinações e falhar em outras.
+- Não coloque chaves permanentes de servidor em código público. Em produção, gere credenciais TURN temporárias no backend.
+- Após atualizar o site, feche/reabra ou recarregue os PWAs para aplicar a nova versão.
