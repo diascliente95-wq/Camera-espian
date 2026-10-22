@@ -30,3 +30,13 @@
 5. Para terminar, toque em **Encerrar conexão** no aparelho que compartilha ou no visualizador.
 
 Este pareamento usa PeerJS Cloud como serviço de sinalização e WebRTC para mídia. A disponibilidade depende do serviço externo e das redes usadas. O código não é uma credencial de autenticação forte: trate-o como informação privada e encerre a sessão quando terminar. O protótipo aceita uma chamada ativa por vez, não envia áudio e não substitui autenticação de produção, TURN gerenciado ou pareamento com expiração no servidor.
+
+
+## Dois PWAs separados
+- **Camera (transmissor):** `/camera/` — inicia a câmera após consentimento explícito, mostra um código de pareamento e transmite somente vídeo.
+- **Viewer (receptor):** `/viewer/` — recebe o código e mostra a imagem ao vivo.
+- Abra ambos por HTTPS. O pareamento usa PeerJS Cloud para sinalização e WebRTC com STUN; algumas redes podem exigir TURN.
+- Para encerrar, use o botão de encerramento. Não compartilhe códigos publicamente.
+
+### Limite importante de PWA
+Service workers não permanecem em execução contínua e não podem manter a câmera aberta de forma confiável com o app fechado/em segundo plano. Esta versão exige manter a tela Camera aberta. Para transmissão de câmera em segundo plano com notificação permanente no Android, é necessário um aplicativo Android nativo com serviço em primeiro plano, permissões adequadas e controles visíveis. A câmera sempre requer autorização do usuário.
