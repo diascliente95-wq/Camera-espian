@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0b1220">
+<title>Camera Espian — Câmera Web</title>
+<style>
+:root{color-scheme:dark;--bg:#070b14;--panel:#101827;--line:#263449;--accent:#36e0b4;--muted:#9aacbf}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#14243a 0,#070b14 60%);font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#f4f7fb;min-height:100vh}
+main{width:min(960px,100%);margin:auto;padding:22px 16px 40px}.top{display:flex;align-items:center;gap:12px;margin-bottom:20px}.logo{width:46px;height:46px;border-radius:14px;background:#123b39;color:var(--accent);display:grid;place-items:center;font-size:24px;border:1px solid #26665e}.eyebrow{color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.15em;text-transform:uppercase}.top h1{font-size:clamp(23px,5vw,34px);margin:2px 0}.sub{color:var(--muted);margin:0;font-size:14px}
+.card{background:rgba(16,24,39,.94);border:1px solid var(--line);border-radius:20px;padding:16px;margin:14px 0;box-shadow:0 14px 40px #0003}.view{position:relative;aspect-ratio:4/3;background:#03060b;border-radius:14px;overflow:hidden;display:grid;place-items:center;border:1px solid #263449}video{width:100%;height:100%;object-fit:contain;display:none}.placeholder{text-align:center;padding:24px;color:var(--muted)}.placeholder .cam{font-size:48px;margin-bottom:10px}.status{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:13px;margin:12px 2px}.dot{height:9px;width:9px;border-radius:50%;background:#718096}.dot.live{background:#ff4757;box-shadow:0 0 10px #ff4757}.controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}.controls button{min-height:48px}.btn{border:1px solid #34465f;border-radius:12px;background:#19263a;color:#f4f7fb;padding:12px 14px;font-weight:700;font-size:14px;cursor:pointer}.btn.primary{background:var(--accent);border-color:var(--accent);color:#04251f}.btn.record{background:#4a1924;border-color:#773144}.btn:disabled{opacity:.45;cursor:not-allowed}.info{font-size:13px;color:var(--muted);line-height:1.55}.pill{display:inline-block;border:1px solid var(--line);border-radius:999px;padding:5px 9px;margin:4px 4px 0 0;font-size:11px;color:#b6c7d9}.notice{border-left:3px solid var(--accent);padding:10px 12px;background:#0c2828;border-radius:8px;color:#c7f6ea;font-size:13px;line-height:1.5}.hidden{display:none!important}a{color:var(--accent)}footer{text-align:center;color:#72839a;font-size:12px;padding:15px}
+@media(min-width:700px){.content{display:grid;grid-template-columns:1.5fr 1fr;gap:14px;align-items:start}.controls{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+<main>
+<header class="top"><div class="logo" aria-hidden="true">◉</div><div><div class="eyebrow">Camera Espian</div><h1>Câmera Web</h1><p class="sub">Visualização e gravação local, com sua autorização.</p></div></header>
+<div class="notice">Sua câmera só será acessada depois que você tocar em <strong>Ativar câmera</strong> e aceitar a permissão do navegador. A gravação é iniciada e parada por você.</div>
+<div class="content">
+<section class="card">
+<div class="view"><video id="video" autoplay playsinline muted></video><div id="placeholder" class="placeholder"><div class="cam">📷</div><strong>Câmera desligada</strong><div class="info">Ative para ver a imagem ao vivo.</div></div></div>
+<div class="status"><span id="dot" class="dot"></span><span id="status" aria-live="polite">Câmera desligada</span></div>
+<div class="controls">
+<button class="btn primary" id="start">Ativar câmera</button>
+<button class="btn" id="switch" disabled>Trocar câmera</button>
+<button class="btn record" id="record" disabled>● Iniciar gravação</button>
+<button class="btn" id="stopRecord" disabled>Parar gravação</button>
+<button class="btn" id="stop" disabled>Desligar câmera</button>
+<a class="btn hidden" id="download" download="camera-espian.webm">Baixar gravação</a>
+</div>
+<p class="info">Dica: use HTTPS (por exemplo, GitHub Pages) e permita o acesso à câmera quando o navegador perguntar. A troca de câmera depende do aparelho.</p>
+</section>
+<aside class="card">
+<h2 style="margin-top:0;font-size:19px">Como funciona</h2>
+<p class="info">1. Toque em <strong>Ativar câmera</strong>.<br>2. Autorize a câmera no navegador.<br>3. Para gravar, toque em <strong>Iniciar gravação</strong> e depois em <strong>Parar gravação</strong>.<br>4. Baixe o arquivo para salvá-lo no aparelho.</p>
+<div><span class="pill">Sem conta</span><span class="pill">Sem envio automático</span><span class="pill">Controles visíveis</span></div>
+<hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+<h3 style="font-size:15px">Privacidade</h3>
+<p class="info">Este protótipo não envia áudio ou vídeo para um servidor. O arquivo de gravação é gerado no navegador e baixado somente quando você solicita. Fechar a página ou desligar a câmera interrompe a captura.</p>
+<p id="message" class="info" aria-live="polite"></p>
+</aside>
+</div>
+<footer>Camera Espian • Protótipo de câmera autorizado</footer>
+</main>
+<script>
+(() => {
+  const video = document.getElementById('video');
+  const placeholder = document.getElementById('placeholder');
+  const status = document.getElementById('status');
+  const dot = document.getElementById('dot');
+  const startBtn = document.getElementById('start');
+  const switchBtn = document.getElementById('switch');
+  const recordBtn = document.getElementById('record');
+  const stopRecordBtn = document.getElementById('stopRecord');
+  const stopBtn = document.getElementById('stop');
+  const download = document.getElementById('download');
+  const message = document.getElementById('message');
+  let stream = null, recorder = null, chunks = [], facing = 'environment', recordedUrl = null;
+
+  function setLive(live) {
+    dot.classList.toggle('live', live);
+    status.textContent = live ? 'Câmera ativa — visualização local' : 'Câmera desligada';
+    placeholder.classList.toggle('hidden', live);
+    video.style.display = live ? 'block' : 'none';
+    startBtn.disabled = live;
+    switchBtn.disabled = !live;
+    recordBtn.disabled = !live || !window.MediaRecorder || (recorder && recorder.state === 'recording');
+    stopBtn.disabled = !live;
+  }
+
+  async function startCamera() {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      message.textContent = 'Este navegador não oferece acesso à câmera nesta página. Abra o site por HTTPS e tente novamente.';
+      return;
+    }
+    try {
+      if (stream) stopCamera();
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: false
+      });
+      video.srcObject = stream;
+      await video.play();
+      setLive(true);
+      message.textContent = 'Câmera ligada. Nenhuma gravação acontece até você iniciar.';
+    } catch (e) {
+      message.textContent = e.name === 'NotAllowedError'
+        ? 'Permissão negada. Autorize a câmera nas configurações do navegador para continuar.'
+        : 'Não foi possível abrir a câmera. Verifique se outro aplicativo está usando-a e tente novamente.';
+      setLive(false);
+    }
+  }
+
+  function stopCamera() {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    stream = null;
+    video.srcObject = null;
+    setLive(false);
+  }
+
+  function startRecording() {
+    if (!stream || !window.MediaRecorder) {
+      message.textContent = 'Gravação não suportada neste navegador.';
+      return;
+    }
+    chunks = [];
+    try {
+      const mime = ['video/webm;codecs=vp9','video/webm;codecs=vp8','video/webm'].find(t => MediaRecorder.isTypeSupported(t));
+      recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      recorder.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = () => {
+        if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'video/webm' });
+        recordedUrl = URL.createObjectURL(blob);
+        download.href = recordedUrl;
+        download.classList.remove('hidden');
+        message.textContent = 'Gravação pronta. Toque em “Baixar gravação” para salvá-la no aparelho.';
+        recordBtn.disabled = !stream;
+        stopRecordBtn.disabled = true;
+      };
+      recorder.start();
+      recordBtn.disabled = true;
+      stopRecordBtn.disabled = false;
+      message.textContent = 'Gravando. Toque em “Parar gravação” quando terminar.';
+    } catch (e) {
+      message.textContent = 'Não foi possível iniciar a gravação neste navegador.';
+    }
+  }
+
+  startBtn.addEventListener('click', startCamera);
+  switchBtn.addEventListener('click', async () => {
+    facing = facing === 'environment' ? 'user' : 'environment';
+    await startCamera();
+  });
+  recordBtn.addEventListener('click', startRecording);
+  stopRecordBtn.addEventListener('click', () => {
+    if (recorder && recorder.state === 'recording') recorder.stop();
+  });
+  stopBtn.addEventListener('click', stopCamera);
+  window.addEventListener('pagehide', () => {
+    if (stream) stream.getTracks().forEach(track => track.stop());
+    if (recordedUrl) URL.revokeObjectURL(recordedUrl);
+  });
+  setLive(false);
+  if (!window.MediaRecorder) recordBtn.title = 'Este navegador não suporta gravação via MediaRecorder.';
+})();
+</script>
+</body>
+</html>
