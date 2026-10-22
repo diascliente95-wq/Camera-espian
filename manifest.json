@@ -1,0 +1,19 @@
+{
+  "name": "Camera Espian",
+  "short_name": "Camera Espian",
+  "description": "Câmera web com fotos e gravação local autorizada.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#070b14",
+  "theme_color": "#0b1220",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "orientation": "any"
+}
